@@ -459,13 +459,24 @@ pub fn create_coin_input(coin: Coin, witness_index: u8) -> FuelInput {
 }
 
 pub fn create_coin_message_input(message: Message, witness_index: u8) -> FuelInput {
-    FuelInput::message_coin_signed(
-        message.sender.into(),
-        message.recipient.into(),
-        message.amount,
-        message.nonce,
-        witness_index,
-    )
+    if message.data.is_empty() {
+        FuelInput::message_coin_signed(
+            message.sender.into(),
+            message.recipient.into(),
+            message.amount,
+            message.nonce,
+            witness_index,
+        )
+    } else {
+        FuelInput::message_data_signed(
+            message.sender.into(),
+            message.recipient.into(),
+            message.amount,
+            message.nonce,
+            witness_index,
+            message.data,
+        )
+    }
 }
 
 pub fn create_coin_predicate(
@@ -491,14 +502,26 @@ pub fn create_coin_message_predicate(
     code: Vec<u8>,
     predicate_data: Vec<u8>,
 ) -> FuelInput {
-    FuelInput::message_coin_predicate(
-        message.sender.into(),
-        message.recipient.into(),
-        message.amount,
-        message.nonce,
-        code,
-        predicate_data,
-    )
+    if message.data.is_empty() {
+        FuelInput::message_coin_predicate(
+            message.sender.into(),
+            message.recipient.into(),
+            message.amount,
+            message.nonce,
+            code,
+            predicate_data,
+        )
+    } else {
+        FuelInput::message_data_predicate(
+            message.sender.into(),
+            message.recipient.into(),
+            message.amount,
+            message.nonce,
+            message.data,
+            code,
+            predicate_data,
+        )
+    }
 }
 
 #[cfg(test)]
