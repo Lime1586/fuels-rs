@@ -1127,7 +1127,7 @@ mod tests {
     fn encoding_std_string() -> Result<()> {
         // arrange
         let string = String::from("This ");
-        let token = Token::StdString(string.clone());
+        let token = Token::StdString(string);
         let offset = 40;
 
         // act
