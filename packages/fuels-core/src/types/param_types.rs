@@ -47,6 +47,7 @@ pub enum ParamType {
     Tuple(Vec<ParamType>),
     RawSlice,
     Bytes,
+    StdString,
 }
 
 pub enum ReturnLocation {
@@ -88,13 +89,17 @@ impl ParamType {
         match &self {
             ParamType::Vector(param_type) => param_type.uses_heap_types(),
             ParamType::Bytes => false,
+            // Here, we return false because even though the `StdString` type has an underlying
+            // `Bytes` type nested, it is an exception that will be generalized as part of
+            // https://github.com/FuelLabs/fuels-rs/discussions/944
+            ParamType::StdString => false,
             _ => self.uses_heap_types(),
         }
     }
 
     fn uses_heap_types(&self) -> bool {
         match &self {
-            ParamType::Vector(..) | ParamType::Bytes => true,
+            ParamType::Vector(..) | ParamType::Bytes | ParamType::StdString => true,
             ParamType::Array(param_type, ..) => param_type.uses_heap_types(),
             ParamType::Tuple(param_types, ..) => Self::any_nested_heap_types(param_types),
             ParamType::Enum {
@@ -117,7 +122,10 @@ impl ParamType {
     }
 
     pub fn is_vm_heap_type(&self) -> bool {
-        matches!(self, ParamType::Vector(..) | ParamType::Bytes)
+        matches!(
+            self,
+            ParamType::Vector(..) | ParamType::Bytes | ParamType::StdString
+        )
     }
 
     /// Compute the inner memory size of a containing heap type (`Bytes` or `Vec`s).
@@ -127,7 +135,7 @@ impl ParamType {
                 Some(inner_param_type.compute_encoding_width() * WORD_SIZE)
             }
             // `Bytes` type is byte-packed in the VM, so it's the size of an u8
-            ParamType::Bytes => Some(std::mem::size_of::<u8>()),
+            ParamType::Bytes | ParamType::StdString => Some(std::mem::size_of::<u8>()),
             _ => None,
         }
     }
@@ -151,7 +159,7 @@ impl ParamType {
             | ParamType::U64
             | ParamType::Bool => 1,
             ParamType::U128 | ParamType::RawSlice => 2,
-            ParamType::Vector(_) | ParamType::Bytes => 3,
+            ParamType::Vector(_) | ParamType::Bytes | ParamType::StdString => 3,
             ParamType::U256 | ParamType::B256 => 4,
             ParamType::Array(param, count) => param.compute_encoding_width() * count,
             ParamType::String(len) => count_words(*len),
@@ -332,6 +340,7 @@ impl TryFrom<&Type> for ParamType {
             try_tuple,
             try_vector,
             try_bytes,
+            try_std_string,
             try_raw_slice,
             try_enum,
             try_u128,
@@ -407,6 +416,12 @@ fn try_bytes(the_type: &Type) -> Result<Option<ParamType>> {
     Ok(["struct std::bytes::Bytes", "struct Bytes"]
         .contains(&the_type.type_field.as_str())
         .then_some(ParamType::Bytes))
+}
+
+fn try_std_string(the_type: &Type) -> Result<Option<ParamType>> {
+    Ok(["struct std::string::String", "struct String"]
+        .contains(&the_type.type_field.as_str())
+        .then_some(ParamType::StdString))
 }
 
 fn try_raw_slice(the_type: &Type) -> Result<Option<ParamType>> {
@@ -1289,6 +1304,7 @@ mod tests {
         assert!(!ParamType::String(10).contains_nested_heap_types());
         assert!(!ParamType::RawSlice.contains_nested_heap_types());
         assert!(!ParamType::Bytes.contains_nested_heap_types());
+        assert!(!ParamType::StdString.contains_nested_heap_types());
         Ok(())
     }
 
@@ -1444,6 +1460,24 @@ mod tests {
         let param_type = try_raw_slice(&the_type).unwrap().unwrap();
 
         assert_eq!(param_type, ParamType::RawSlice);
+    }
+
+    fn try_std_string_correctly_resolves_param_type() {
+        let the_type = given_type_with_path("std::string::String");
+
+        let param_type = try_std_string(&the_type).unwrap().unwrap();
+
+        assert_eq!(param_type, ParamType::StdString);
+    }
+
+    #[test]
+    fn try_std_string_is_type_path_backward_compatible() {
+        // TODO: To be removed once https://github.com/FuelLabs/fuels-rs/issues/881 is unblocked.
+        let the_type = given_type_with_path("String");
+
+        let param_type = try_std_string(&the_type).unwrap().unwrap();
+
+        assert_eq!(param_type, ParamType::StdString);
     }
 
     fn given_type_with_path(path: &str) -> Type {
