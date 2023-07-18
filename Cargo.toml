@@ -74,14 +74,14 @@ tokio = { version = "1.27.0", default-features = false }
 trybuild = "1.0.80"
 which = { version = "4.4", default-features = false }
 
-# Depednencies from `fuel-core` repository:
+# Depednencies from the `fuel-core` repository:
 # The version should be the same as in the target branch - `master`. Otherwise `[patch.crates-io]` doesn't work.
 fuel-core = { version = "0.20.1", default-features = false }
 fuel-core-chain-config = { version = "0.20.1", default-features = false }
 fuel-core-client = { version = "0.20.1", default-features = false }
 fuel-core-types = { version = "0.20.1", default-features = false }
 
-# Depednencies from `fuel-vm` repository:
+# Depednencies from the `fuel-vm` repository:
 # For dependencies from the `fuel-vm` repository, we need to use the same version as the `fuel-core master`.
 fuel-asm = "0.35.0"
 fuel-crypto = "0.35.0"
